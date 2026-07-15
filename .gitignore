@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Virtual environment
+.venv/
+
+# Data (large, regenerable via extract/ scripts or manually uploaded)
+data/raw/*
+data/extract/*
+!data/raw/.gitkeep
+!data/extract/.gitkeep
+
+# OS
+.DS_Store
