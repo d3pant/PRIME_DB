@@ -7,13 +7,17 @@ __pycache__/
 .venv/
 
 # Data (large, regenerable via extract/ and transform/ scripts, or manually uploaded)
-data/raw/*
-data/extract/*
-!data/raw/.gitkeep
-!data/extract/.gitkeep
-data/transformed/
+data/
 transform/**/data/
+data_original/
 EDA/*.xlsx
+
+# BioThings CLI hub state (dumps, SQLite databases, logs); rebuilt by `biothings-cli dataplugin dump` / `upload`
+.biothings_hub/
+
+# Scratch
+/parser/
+plugin/export_jsonl.py
 
 # OS
 .DS_Store

@@ -228,6 +228,23 @@ for i, col in enumerate(lineage_cols):
 resolved_df = pd.DataFrame(rows)
 before_dedup = len(resolved_df)
 
+# Enrich every resolved taxid with parent_taxid/lineage via a single batched
+# gettaxa call (by id, not by name) -- matches GMREPO_V3's taxon_nodes.py schema
+# and the two-step name->taxid, taxid->info pattern used elsewhere for this API.
+# Both the main walk-up and the eutils genus salvage only resolve a name to a
+# taxid; this is the one place parent_taxid/lineage get filled in, from biothings
+# alone, for every resolved taxon regardless of which path found it.
+distinct_taxids = [t for t in resolved_df["taxid"].unique().tolist() if t != UNASSIGNED_TAXID]
+taxon_infos = client.gettaxa(distinct_taxids, fields=["parent_taxid", "lineage"])
+info_by_taxid = {int(info["_id"]): info for info in taxon_infos if not info.get("notfound")}
+
+resolved_df["parent_taxid"] = resolved_df["taxid"].map(
+    lambda t: info_by_taxid[t].get("parent_taxid") if t in info_by_taxid else None
+)
+resolved_df["lineage"] = resolved_df["taxid"].map(
+    lambda t: info_by_taxid[t].get("lineage") if t in info_by_taxid else None
+)
+
 # Lookup table: one row per resolved SILVA lineage column -> its taxon id. This is
 # what a later edge-building script joins against silva_genus_absolute.parquet's
 # column headers (Run -> Taxon edges), since the node table below is deduped and
@@ -244,6 +261,8 @@ taxon_df = (
     .agg(
         taxid=("taxid", "first"),
         name=("name", "first"),
+        parent_taxid=("parent_taxid", "first"),
+        lineage=("lineage", "first"),
         original_name=("lineage_string", list),
         rank=("rank", "first"),
         category=("category", "first"),

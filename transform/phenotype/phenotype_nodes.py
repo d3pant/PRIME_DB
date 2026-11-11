@@ -13,11 +13,46 @@ ACCEPTED_PREFIXES = ("MONDO:", "HP:")
 ACCEPTED_CATEGORIES = {"biolink:Disease", "biolink:PhenotypicFeature", "biolink:DiseaseOrPhenotypicFeature"}
 NAMERES_BASE = "https://name-resolution-sri.renci.org"
 
+# Cosmetic display-name formatting for original_name -- purely for readability;
+# dedup below is still keyed on the resolved ontology CURIE (id), never on this
+# string, so collisions/variants here can't create duplicate nodes.
+EPONYM_FIXES = {"crohns": "Crohn", "alzheimers": "Alzheimer", "barretts": "Barrett"}
+ACRONYMS = {"covid", "hbv"}
+ROMAN_NUMERALS = {"i", "ii", "iii", "iv", "v"}
+MINOR_WORDS = {"of", "and", "the", "in", "on", "for", "to", "a", "an", "or", "with", "vs"}
+
 
 def normalize_phenotype_cell(raw: str) -> list[str]:
     cleaned = re.sub(r"\([^)]*\)", "", raw)
     cleaned = cleaned.replace("'", "").replace("’", "").replace("‘", "")
     return [t.strip().lower() for t in cleaned.split(",") if t.strip()]
+
+
+def format_display_name(term: str) -> str:
+    """Title-case a normalized (lowercase) phenotype term for display, preserving
+    acronyms (COVID, HBV) and roman numerals (Type I/II), and fixing the couple of
+    eponyms whose trailing "s" is a stripped possessive ("crohns" -> "Crohn")."""
+    parts = re.split(r"([\s\-/]+)", term)
+    word_idx = 0
+    out = []
+    for part in parts:
+        if re.match(r"^[\s\-/]+$", part) or part == "":
+            out.append(part)
+            continue
+        lw = part.lower()
+        if lw in EPONYM_FIXES:
+            word = EPONYM_FIXES[lw]
+        elif lw in ACRONYMS:
+            word = lw.upper()
+        elif lw in ROMAN_NUMERALS:
+            word = lw.upper()
+        elif lw in MINOR_WORDS and word_idx > 0:
+            word = lw
+        else:
+            word = part[:1].upper() + part[1:].lower()
+        out.append(word)
+        word_idx += 1
+    return "".join(out)
 
 
 samples_df = pd.read_parquet(SAMPLES_PARQUET)
@@ -101,12 +136,21 @@ for term in phenotype_terms:
     if curie is None:
         continue
 
-    rows.append({"id": curie, "original_name": term, "category": "biolink:DiseaseOrPhenotypicFeature", "_final_curie_name": name})
+    rows.append(
+        {
+            "id": curie,
+            "original_name": format_display_name(term),
+            "category": "biolink:DiseaseOrPhenotypicFeature",
+            "_final_curie_name": name,
+        }
+    )
 
 phenotype_df = pd.DataFrame(rows)
 
 # A node table must have exactly one row per distinct id -- multiple source terms
-# can resolve (or be overridden) onto the same CURIE.
+# can resolve (or be overridden) onto the same CURIE. Dedup key is the ontology
+# CURIE (id), never original_name, so the display-name formatting above cannot
+# introduce or hide a duplicate-node bug.
 before_dedup = len(phenotype_df)
 collapsed = {
     curie: group["original_name"].tolist()

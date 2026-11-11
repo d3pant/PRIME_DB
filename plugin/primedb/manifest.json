@@ -1,0 +1,29 @@
+{
+  "version": "0.3",
+  "display_name": "PRIMEDB",
+  "__metadata__": {
+    "url": "https://primedb.sjtu.edu.cn/",
+    "description": "PRIMEDB human microbiome sample metadata and SILVA 138.2 genus-level abundance, as sample-taxon (HAS_TAXON) and sample-phenotype (HAS_PHENOTYPE) associations"
+  },
+  "requires": [
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "requests",
+    "biothings_client",
+    "node-synonymizer"
+  ],
+  "dumper": {
+    "data_url": [
+      "https://primedb.sjtu.edu.cn/api/download/sample?format=csv",
+      "https://primedb.sjtu.edu.cn/api/v1/abundances/cache/silva/genus/absolute",
+      "https://primedb.sjtu.edu.cn/api/v1/abundances/cache/silva/genus/relative"
+    ],
+    "uncompress": false,
+    "release": "versions:get_release"
+  },
+  "uploader": {
+    "parser": "primedb_parser:load_data",
+    "on_duplicates": "error"
+  }
+}

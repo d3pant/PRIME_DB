@@ -41,17 +41,19 @@ for run in absolute_by_run.index:
     body_site_term = body_site_raw.split("/")[-1].strip().lower() if body_site_raw else None
     body_site_match = body_site_lookup.get(body_site_term) if body_site_term else None
 
-    anatomical_entity = None
+    anatomical_entity_id = None
+    anatomical_entity_original_name = None
+    anatomical_entity_category = None
     if body_site_term:
-        anatomical_entity = {
-            "id": body_site_match["id"] if body_site_match else None,
-            "original_name": body_site_term,
-            "category": "biolink:AnatomicalEntity",
-        }
+        anatomical_entity_id = body_site_match["id"] if body_site_match else None
+        anatomical_entity_original_name = body_site_term
+        anatomical_entity_category = "biolink:AnatomicalEntity"
 
-    publication = None
+    publication_doi = None
+    publication_category = None
     if info["Doi"]:
-        publication = {"doi": f"doi:{info['Doi']}", "category": "biolink:Publication"}
+        publication_doi = f"doi:{info['Doi']}"
+        publication_category = "biolink:Publication"
 
     absolute_row = absolute_by_run.loc[run]
     relative_row = relative_by_run.loc[run]
@@ -82,24 +84,40 @@ for run in absolute_by_run.index:
 
         rows.append(
             {
-                "id": f"{biosample}_{run}_has_taxon_{taxid_suffix}",
-                "association": {
-                    "category": "MaterialSampleToOrganismTaxonAssociation",
-                    "predicate": "has_taxon",
-                    "BioProject": info["BioProject"],
-                    "SRA Run ID": run,
-                    "project_name": info["Project_name"],
-                    "relative_abundance": abundance["relative"],
-                    "absolute_abundance": abundance["absolute"],
-                    "instrument": info["Instrument"],
-                    "primary_knowledge_source": ["infores:PRIMEDB"],
-                    "aggregator_knowledge_source": None,
-                    "agent_type": "biolink:manual_agent",
-                    "publication": publication,
-                    "anatomical_entity": anatomical_entity,
-                },
+                # HAS_TAXON (SCREAMING_SNAKE_CASE) matches the relationship type used
+                # at bulk-load time and GMREPO_V3's own id convention for this edge.
+                "id": f"{biosample}_{run}_HAS_TAXON_{taxid_suffix}",
                 "subject": biosample,
                 "object": taxon_id,
+                # Deliberately NOT biolink:-prefixed, unlike has_phenotype's category
+                # ("biolink:MaterialSampleToDiseaseOrPhenotypicFeatureAssociation").
+                # The prefix standardization below applies to `predicate` only; both
+                # this repo and GMREPO_V3 agree on this exact unprefixed category value
+                # for HAS_TAXON, so changing it would break that agreement for no gain.
+                "category": "MaterialSampleToOrganismTaxonAssociation",
+                # Prefixed style, consistent with has_phenotype's predicate below --
+                # PRIMEDB previously mixed "has_taxon" (bare) and "biolink:has_phenotype"
+                # (prefixed) across its two edge types; standardized on prefixed.
+                "predicate": "biolink:has_taxon",
+                # BioProject: the study ACCESSION (e.g. "PRJDB13875") -- matches
+                # GMREPO_V3's own edge-level "BioProject" property name/casing exactly.
+                # project_name: a separate, human-readable study name (e.g.
+                # "MUSC-JP-2024"), not a duplicate/alias of BioProject -- intentionally
+                # kept as its own property, GMREPO_V3's edges have no equivalent.
+                "BioProject": info["BioProject"],
+                "sra_run_id": run,
+                "project_name": info["Project_name"],
+                "relative_abundance": abundance["relative"],
+                "absolute_abundance": abundance["absolute"],
+                "instrument": info["Instrument"],
+                "primary_knowledge_source": ["infores:PRIMEDB"],
+                "aggregator_knowledge_source": None,
+                "agent_type": "biolink:manual_agent",
+                "publication_doi": publication_doi,
+                "publication_category": publication_category,
+                "anatomical_entity_id": anatomical_entity_id,
+                "anatomical_entity_original_name": anatomical_entity_original_name,
+                "anatomical_entity_category": anatomical_entity_category,
             }
         )
 

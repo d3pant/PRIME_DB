@@ -44,9 +44,11 @@ for biosample, terms in phenotype_sets_by_biosample.items():
         continue
 
     info = first_per_biosample.loc[biosample]
-    publication = None
+    publication_doi = None
+    publication_category = None
     if pd.notna(info["Doi"]):
-        publication = {"doi": f"doi:{info['Doi']}", "category": "biolink:Publication"}
+        publication_doi = f"doi:{info['Doi']}"
+        publication_category = "biolink:Publication"
 
     for term in terms:
         match = term_to_curie.get(term)
@@ -58,18 +60,20 @@ for biosample, terms in phenotype_sets_by_biosample.items():
 
         rows.append(
             {
-                "id": f"{biosample}_has_phenotype_{numeric_id}",
-                "association": {
-                    "category": "biolink:MaterialSampleToDiseaseOrPhenotypicFeatureAssociation",
-                    "predicate": "biolink:has_phenotype",
-                    "BioProject": info["BioProject"],
-                    "primary_knowledge_source": ["infores:PRIMEDB"],
-                    "aggregator_knowledge_source": None,
-                    "agent_type": "biolink:manual_agent",
-                    "publication": publication,
-                },
+                # HAS_PHENOTYPE (SCREAMING_SNAKE_CASE) matches the relationship type
+                # used at bulk-load time, and keeps id casing consistent with
+                # HAS_TAXON's own id convention (see has_taxon_edge.py).
+                "id": f"{biosample}_HAS_PHENOTYPE_{numeric_id}",
                 "subject": biosample,
                 "object": curie,
+                "category": "biolink:MaterialSampleToDiseaseOrPhenotypicFeatureAssociation",
+                "predicate": "biolink:has_phenotype",
+                "BioProject": info["BioProject"],
+                "primary_knowledge_source": ["infores:PRIMEDB"],
+                "aggregator_knowledge_source": None,
+                "agent_type": "biolink:manual_agent",
+                "publication_doi": publication_doi,
+                "publication_category": publication_category,
             }
         )
 
