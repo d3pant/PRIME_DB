@@ -4,3 +4,5 @@ pyarrow>=17.0
 ipykernel
 rapidfuzz
 node-synonymizer
+biothings_client
+biothings[cli]
