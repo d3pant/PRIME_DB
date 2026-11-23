@@ -32,11 +32,8 @@ phenotype_sets_by_biosample = (
     .apply(lambda s: {t for raw in s for t in normalize_phenotype_cell(raw)})
 )
 
-conflicting = set()
-for biosample, terms in phenotype_sets_by_biosample.items():
-    per_run_sets = samples_df.loc[samples_df["BioSample"] == biosample, "Phenotype"].dropna()
-    if per_run_sets.nunique() > 1:
-        conflicting.add(biosample)
+nunique_phenotypes = samples_df.groupby("BioSample")["Phenotype"].nunique()
+conflicting = set(nunique_phenotypes[nunique_phenotypes > 1].index)
 
 rows = []
 for biosample, terms in phenotype_sets_by_biosample.items():

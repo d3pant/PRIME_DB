@@ -11,8 +11,8 @@ Inputs in data_folder (written by the dumper, named from Content-Disposition):
     samples.csv, silva_genus_absolute.csv, silva_genus_relative.csv
 data_folder must not be the repo's own data/raw (stage_inputs.sh wipes that folder).
 
-This module expects to live inside the PRIMEDB repo checkout (plugin/primedb/) so it can
-find the two scripts; set PRIMEDB_REPO to point at the checkout otherwise. The ETL's own
+This module expects to live at the root of the PRIMEDB repo checkout so it can find the
+two scripts; set PRIMEDB_REPO to point at the checkout otherwise. The ETL's own
 dependencies (pandas, pyarrow, node-synonymizer, biothings_client, requests) must be
 installed in the interpreter running the hub.
 
@@ -34,14 +34,11 @@ import pyarrow.parquet as pq
 
 log = logging.getLogger("primedb_parser")
 
-REPO = Path(os.environ.get("PRIMEDB_REPO") or Path(__file__).resolve().parents[2])
+REPO = Path(os.environ.get("PRIMEDB_REPO") or Path(__file__).resolve().parent)
 STAGE_SCRIPT = REPO / "stage_inputs.sh"
 ETL_SCRIPT = REPO / "run_etl.sh"
 BATCH_ROWS = 50_000
 
-# Node properties copied into each document. Taxon nodes also hold `lineage` and
-# `original_name` (every SILVA lineage merged into the node, up to dozens of long strings),
-# which would be repeated on millions of edges, so they are left out.
 
 # NodeSynonymizer (used by phenotype_nodes.py / body_site_mapping.py) logs a dead batch and
 # returns "no match" instead of raising, so the ETL exits 0 with silently missing values.
@@ -91,8 +88,9 @@ def run_etl(data_folder: Path) -> None:
 def _read_nodes(path: Path, fields: list[str] | None = None) -> dict:
     """{id: node dict without null properties}"""
     nodes = {}
-    for row in pq.read_table(path, columns=fields).to_pylist():
-        nodes[row["id"]] = {k: v for k, v in row.items() if v is not None}
+    for batch in pq.ParquetFile(path).iter_batches(columns=fields):
+        for row in batch.to_pylist():
+            nodes[row["id"]] = {k: v for k, v in row.items() if v is not None}
     return nodes
 
 
